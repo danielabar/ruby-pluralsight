@@ -48,6 +48,14 @@
     - [Splat Operator](#splat-operator)
   - [Methods in Depth](#methods-in-depth)
     - [Default Parameter Values](#default-parameter-values)
+    - [Variable Length Parameter Lists](#variable-length-parameter-lists)
+    - [Keyword Arguments](#keyword-arguments)
+    - [Method Aliasing](#method-aliasing)
+    - [Operators](#operators)
+    - [Method Calls as Messages](#method-calls-as-messages)
+    - [method_missing](#method_missing)
+  - [More Ruby Tools: Blocks, Constants, Modules](#more-ruby-tools-blocks-constants-modules)
+    - [Blocks](#blocks)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2258,3 +2266,265 @@ Splat operator works on any class that implements `to_a` method [Example](module
 ## Methods in Depth
 
 ### Default Parameter Values
+
+- Cannot define two methods with same name but different parameter lists
+- Use default arguments for flexible interfaces not forcing caller to specify everything
+- Default values for parameters specified in function definition with `=` and expression
+- Expression not limited to simple value, could be another method call or conditional logic
+- Default values are calculated when method is called, not when method is defined
+
+```ruby
+def produce_spaceshp(type = :freighter, size = :xl)
+  # ...
+end
+
+def produce_spaceshp(type = :freighter, size = calc_default_size(type))
+  # ...
+end
+
+def produce_spaceshp(type = :freighter, size = (type == :freighter ? :xl : m))
+  # ...
+end
+```
+
+- Optional parameters don't have to be at the end of parameter list
+- If required parameters follow a list of optional, will be correctly assigned
+- Can't intermingle optional and required params arbitrarily
+
+```ruby
+def produce_spaceship(type = :freighter, size = :xl, engine_count)
+  # ...
+end
+
+factory.produce_shaceship(4) # sets engine_count to 4
+```
+
+### Variable Length Parameter Lists
+
+- Some methods need to take an arbitrary number of args
+- Use splat
+
+```ruby
+# first argument this is called with gets assigned to days_to_complete
+# remainder of arguments get assigned to types array
+def produce_fleet(days_to_compete, *types)
+  #...
+end
+
+produce_fleet(10, :freighter, :freighter, :explorer)
+# days_to_complete === 10, types == [:freighter, :freighter, :explorer]
+```
+
+- Array argument doesn't have to be last in argument list
+- Parameter list wiht splat works the same as list of variables on LHS of parallel assignment
+- Can combine with default parameter values
+- Optional params should come before array param
+- Args passed to method first used to provide values for optional params, and remaining are assigned to array parameter
+
+```ruby
+def produce_fleet(days_to_complete = 10, *types)
+  #...
+end
+
+# Call with no args, then days_to_complete == 10, types == nil
+produce_fleet
+# Call with args, then days_to_complete == 15, types == [:freighter, :freighter, :explorer]
+produce_fleet(15, :freighter, :freighter, :explorer)
+# BUT cannot omit first argument because days_to_compete will always get assigned to whatever is passed as first arg
+produce_fleet(:freighter, :freighter, :explorer) # days_to_complete == :freighter -> not intended
+```
+
+- Splat operator can be used when calling a method.
+- Converts argument its applied to into array by calling arguments `to_a` method.
+- Elements of array inserted into argument list
+- Splat op in method calls is same as when splat used on RHS of parallel assignment
+
+```ruby
+ship_types = [:freighter, :freighter, :explorer]
+produce_fleet(15, *ship_types)
+```
+
+### Keyword Arguments
+
+- When method takes a lot of parameters, can become difficult to read - what does each arg represent? `produce_shaceship(:frieghter, :m, 100, 4)`
+- Keyword arguments used to make calling methods more legible -> provide argument name followed by `:`, then value
+- When defining a method with keyword args, params must have default values
+- Keyword args can be supplied to a method in different order than defined (because can be identified by name)
+
+```ruby
+def produce_spaceship(type: freighter, size: xl, fuel_tank_volume: 400, engine_count: 2)
+  #...
+end
+produce_spaceship(type: :frieghter, size: :m, fuel_tank_volume: 100, engine_count 4)
+```
+
+Keyword args can co-exist with regular args, as long as the regular parameters are defined first
+
+```ruby
+# type is a regular parameter with default value, size and engine_count are keyword args
+def produce_spaceship(type = :frieghter, size: :m, engine_count: 2)
+  # ...
+end
+```
+
+- If try to pass keyword args to method where those are not part of its definition, get error
+- But adding double splat parameter to end of parameter list in method definition - collects any keyword arguments that aren't part of definition
+- Double splat parameter gets assigned hash of the "undefined" keyword args
+- Useful for method supporting options
+
+```ruby
+def produce_spaceship(type = :freighter, size: :m, **custom_components)
+  # standard
+  components = {
+    engine: :standard,
+    seats: :standard,
+    subwoofer: none
+  }
+  # custom
+  # merge! will override values with dupe keys
+  components.merge!(custom_components)
+end
+
+# invoke with custom options for engine and seats
+produce_spaceship(:yacht, size: :s, engine: rolls_royce, seats: :leather)
+```
+
+Even cleaner, first construct a hash, and then pass to method that has double splat arg:
+
+```ruby
+build_params = {size: :s, engine: rolls_royce, seats: :leather}
+produce_spaceship(:yacht, build_params)
+```
+
+Use double splat operator to have variable its applied to treated as a hash and combined with other keyword args:
+
+```ruby
+custom_components = {seats: :leather}
+produce_spaceship(:yacht, size: :s, **custom_components)
+```
+
+### Method Aliasing
+
+[Example](module5/alias_method.rb)
+
+- Use when overriding a method but need to access old version
+- When overriding a base class method, use `super` to call method from base class
+- For monkey patching, need to use aliasing
+- `alias_method` method is for creating a copy of a method with another name
+
+```ruby
+class String
+  def space_out
+    chars.join(" ")
+  end
+
+  # create copy of `size` method named `original_size`
+  alias_method "original_size", "size"
+
+  # override size, invoking original_size
+  def size
+    original_size * 2 - 1
+  end
+end
+
+puts "abc".space_out # a b c
+puts "abc".size # 5
+```
+
+### Operators
+
+- Can define custom versions of many operators when writing a class
+- Many operators are actually methods with syntactic sugar so using them doesn't look like calling a method
+- Logical operators are NOT methods: `&&`, `||`, `not`, `and`, `or`, `?:`
+- Assignment operators are NOT methods: `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `&=` `|=`, `^=`, `>>=`, `<<=`, `&&=`, `||=`
+- All other operators (square brackets, comparison, mathematical, bitwise) are methods - can write your own implementations in a class or override standard implementations.
+
+[Example 1](module5/operators.rb)
+
+Careful with custom operators - can make code cryptic and behave unexpectedly.
+Use operator overloading sparingly - only when makes code more readable.
+
+### Method Calls as Messages
+
+- Calling method in Ruby is accomplished by sending message to object
+- Object looks up corresponding method, and if found, executes it
+- Methods === Message Handlers
+- Object method is called on === Receiver
+- Object class has a `send` method: `a.send(:size)` - send message as symbol, along with any parameters
+
+![method call message](doc-images/method-call-message.png 'method call message')
+
+Convenient, reduces boilerplate, eg: invoking methods in response to user input:
+
+```ruby
+# unweildly case statement
+case input
+when :up_arrow then ship.tilt_up
+when :down_arrow then ship.tilt_down
+when :left_arrow then ship.turn_left
+when :right_arrow then ship.turn_right
+end
+
+# better solution - define hash mapping all potential user input to methods
+handlers = {
+  up_arrow: :tilt_up,
+  down_arrow: :tilt_down,
+  left_arrow: :turn_left,
+  right_arrow: :turn_right
+}
+# dispatch call reduced to single statement
+ship.send(handlers[input])
+
+# If your class already has a method named `send` for a differnet purpose, use Object class send alias `__send__`
+ship.__send__(handlers[input])
+```
+
+**Methods Outside Classes**
+
+When a method is called within a class, it's called on `self`, an _implicit receiver_
+
+```ruby
+class Spaceship
+  def launch
+    batten_hatches # called on self, implicit receiver
+    # ...
+  end
+end
+```
+
+- What about methods defined outside of class, who is the receiver in that case?
+- Every Ruby program has default object `main`
+- Outside any other context, self refers to main
+- Adding a method, eg `double` outside of a custom class adds it to Object class -> available throughout program
+- Calling such a method is called on self, where self is the main object
+- No such thing as "free" methods
+- Methods such as `puts`, `p`, `raise` - part of Object class because it includes `kernel` module defining these methods
+
+```ruby
+2.6.0 :001 > self
+ => main
+2.6.0 :002 > self.class
+ => Object
+```
+
+### method_missing
+
+[Example](module5/method_missing.rb)
+
+- Technique for metaprogramming in Riby
+- What happens when message sent to object but it can't find corresponding method `ship.xxyyzz`
+- Get `NoMethodError`
+- When Ruby goes through class hierarchy and doesn't find method, invokes method named `method_missing`
+- Default implementation of `method_missing` (defined in BasicObject class) raises `NoMethodError` exception
+- Can override `method_missing` with custom implementation
+- Caution can make code difficult to debug and cause performance issues with lots of methods routed this way
+
+**Other Metaprogramming Facilities**
+
+- const_missing (counterpart to method_missing but for constants)
+- adding and removing methods at runtime
+- `inherited` method - executed everytime a subclass of class is created
+
+## More Ruby Tools: Blocks, Constants, Modules
+
+### Blocks

@@ -35,6 +35,19 @@
     - [Scope](#scope)
   - [Standard Types](#standard-types)
     - [Booleans](#booleans)
+  - [Numbers](#numbers)
+    - [Strings](#strings)
+    - [String Operators and Methods](#string-operators-and-methods)
+    - [Regular Expressions](#regular-expressions)
+    - [Symbols](#symbols)
+    - [Arrays](#arrays)
+    - [Enumerable](#enumerable)
+    - [Hashes](#hashes)
+    - [Ranges](#ranges)
+    - [Parallel Assignment](#parallel-assignment)
+    - [Splat Operator](#splat-operator)
+  - [Methods in Depth](#methods-in-depth)
+    - [Default Parameter Values](#default-parameter-values)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1610,3 +1623,638 @@ puts a # error: undefined variable
 ## Standard Types
 
 ### Booleans
+
+- Ruby doesn't have a boolean type
+- `true` is instance of `TrueClass`, `false` instance of `FalseClass`, each of which derives from `Object` class
+- singleton instances
+- boolean can be converted to string, checked for nil (via methods inherited from `Object`)
+
+```ruby
+true.to_s # "true"
+false.nil? # false
+```
+
+## Numbers
+
+- Represented by objects, number is like label for a corresponding object
+- Can call methods in integers and floating point objects
+
+**Integer Nubers**
+
+![integer](doc-images/integer.png 'integer')
+
+- Range of numbers represented by `Fixnum` limited by machine word size and Ruby build
+- `Bignum` for larger numbers and only limited by available memory
+- Conversion between Fixnum and Bignum automatically handled
+- Integer iterals can be written as hex (start with 0x, octal start with 0 or 0o, decimal literals start with 0d or no prefix, binary literals start with 0b)
+- Can use underscore to separate groups of digits for legibility `100_999`, `0b1010_1111_0110`
+
+```ruby
+0xAF    # decimal 175 (hex)
+010     # decimal 8 (octal)
+0o10    # decimal 8 (octal)
+0d175   # decimal 175 (decimal)
+0b1010  # decimal 10 (binary)
+```
+
+**Floating Point Numbers**
+
+- Represented by `Float` class
+- 15 digits of precision
+- Map to machine double type
+- Literals can have optional exponent `1.234`, `1.0e3`
+- Must be at least one digit before and after decimal point - avoid ambiguity with method calls
+- Can use underscores same as integers
+- Mixing floats and integers results in float
+
+```ruby
+2.0 + 30
+=> 32.0
+```
+
+Objects representing numbers are read only. Functions like `f` below don't make sense in Ruby. Instead should return a new number and assign the result.
+
+Other objects including String and Array are mutable.
+
+```ruby
+def f(n)
+  n += 100
+end
+
+a = 10
+f(a)
+=> 110
+a
+=> 10 # `a` was not modified
+```
+
+### Strings
+
+- String class contains ~100 methods, lots of different literal forms
+- Sequence of characters with associated encoding
+- Can be used to represent binary sequences
+- String's encoding is defined by encoding of source file its in
+- Default is UTF-8 but can be modified with special comment at start of file [Example](module4/encoding.rb)
+- `encoding` method outputs encoding of a given string
+
+```ruby
+puts "abc".encoding
+=> #<Encoding:UTF-8>
+```
+
+**String Literals**
+
+When assigning a literal or passing it as argument, new object of class `String` is created.
+
+- single quote: `'Serenity'`, only allows two escape sequences
+- if need to include single quote in string, escape with backslash: `'\'Serenity\''`
+- include backslash by escaping it with another backslash `'Backslash: \\'`
+- instead of single quotes, can use `%q` followed by delimeter. q is for quote, delimeter can be any non alpha-numeric character
+
+```ruby
+%q('Serenity', transport)
+%q['Serenity', transport]
+%q{'Serenity', transport}
+%q<'Serenity', transport>
+```
+
+**Double Quotes**
+
+- Use of double-quotes supports more escape sequences, eg: `\n` newline, `t` tab, `\"` double quote
+- Can insert characters via octal or hec code, eg: `\100` or `x40` results in `@`
+- Can insert unicode points with `\u`, eg: `\u20ac`
+- Combine multiple code points with curly braces: `\u{20ac a3 a3f}`
+- Allow for string interpolation, cleaner than concatenation and better performance, doesn't have to create many new string objects
+- Literals can span multiple lines, new lines and indentation will be included in string
+
+```ruby
+lander_count = 10
+probe_count = 20
+puts "Lander count: #{lander_count}"
+puts "Total units: #{lander_count + probe_count}"
+```
+
+**Heredoc**
+
+- Useful for multi-line string with multiple quotes
+- Denoted by `<<` followed by terminator, in example below, it's `EOS`
+- String ends when second terminator encountered
+- Terminator must be at column 1, unless include `<<-`, then terminator can be indented
+
+```ruby
+message = <<EOS
+  There's no place I can be
+  since I found serenity
+EOS
+
+message = <<-EOS
+  There's no place I can be
+  since I found serenity
+  EOS
+```
+
+### String Operators and Methods
+
+```ruby
+# get character at particular position
+"Hello world"[1]
+=> "e"
+# get substring, first arg is index to start (inclusive), second arg is length
+"hello world"[1, 3]
+=> "ell"
+# check whether substring appears in string
+"Hello world"["or"]
+=> "or"
+"Hello world"["zzz"]
+=> nil
+# Replace substring with another (only first instance)
+a = "Hello Alex"
+=> "Hello Alex"
+a["Alex"] = "George"
+=> "George"
+a
+=> "Hello George"
+# Use multiplication operator to duplicate content of string a multiple of times
+"ha " * 3
+"ha ha ha "
+# Percent operator produces formatted output, eg: numbers with leading zeroes
+# First argument is format specifier, second argument is number
+# Eg: pad to 5 digits with zeroes
+"%05d" % 123
+=> "00123"
+# Limit total number of digits
+"%.8g" % 123.123456789
+=> "123.45678"
+# Plus operator to concatenate strings (but prefer string interpolation)
+"ab" + "cd"
+=> "abcd"
+# Use chars method to get array of characters in string, useful when string contains unicode
+a = "~ 5\u{20ac}"
+=> "~ 5€"
+a.chars
+=> ["~", " ", "5", "€"]
+a.codepoints
+=> [126, 32, 53, 8364]
+a.bytes # note that unicode codepoint uses 3 bytes
+=> [126, 32, 53, 226, 130, 172]
+# string class has iterators: each_char, each_byte, each_codepoint
+# convert case (version with ! modifies string in place, without returns modified string as new object)
+a = "hello"
+=> "hello"
+a.upcase!
+=> "HELLO"
+a.downcase!
+=> "hello"
+```
+
+Many methods in standard library return either a new object, or for `!`, the original object they were called on. Useful for method chaining.
+
+```ruby
+a = "  this is a sentence  "
+# Chain methods to trim trailing whitespace and capitalize first letter
+a.strip!.capitalize!
+=> "This is a sentence"
+# Replace all occurrences of a substring within a string
+"<strong><em>Hi!</em></strong>".gsub("<","[").gsub(">", "]")
+=> "[strong][em]Hi![/em][/strong]"
+# Break up a string into array of substrings based on separator (default space)
+"1 2 3".split
+=> ["1", "2", "3"]
+"1->2->3".split("->")
+=> ["1", "2", "3"]
+```
+
+### Regular Expressions
+
+- `Regexp` class is one of standard types built into Ruby, [docs](https://docs.ruby-lang.org/en/trunk/Regexp.html)
+- [Online Ruby regex tester](https://rubular.com/)
+- To construct a regex, pass a string expression to `Regexp` new method
+- Can also use regex literals denoted by forward slashes: `/(\d+:\d+)(am|pm)/`
+- Can also use `%r` followed by an expression (similar to `%q` for strings): `%r(\d+/\d+)`
+- Just like double-quoted strings, regex patterns support interpolation of ruby expressions, escape sequences and unicode
+
+Use `=~` operator to test for a match, regex pattern can appear on right or left of this operator
+If match found, operator yields starting position of match within string, otherwise nil
+
+```ruby
+/\d+/ =~ "Level 3"
+=> 6
+"Level 3" =~ /\d+/
+=> 6
+/\d+/ =~ "Level"
+=> nil
+```
+
+`!~` checks for lack of a match and yields true/false
+
+```ruby
+/\d+/ !~ "Level 3"
+=> false
+/\d+/ !~ "Level A"
+=> true
+```
+
+Can also use `match` method, returns more detail about the match in a resulting object.
+`match` is part of String and Regexp classes. Returns MatchData object.
+
+```ruby
+m = /(\d+):(\d+)/.match("Time is 12:13am")
+=> #<MatchData "12:13" 1:"12" 2:"13">
+# methods `pre_match` and `post_match` retrieve portions of string before and after the match respectively
+m.pre_match
+=> "Time is "
+# square bracket syntax to get matches, 0 for the whole match, 1, 2, ... for captured subgroups
+m[0]
+=> "12:13"
+m[1]
+=> "12"
+m[2]
+=> "13"
+m[3]
+=> nil
+```
+
+When using `~=` or `match`, some global vars are set:
+
+- `$` is string before match
+- `$'` is string after match
+- `$&` is entire match
+- `$1`, `$2`, etc are submatches
+
+![regexp](doc-images/regexp.png 'regexp')
+
+Use `scan` to match multiple instances of pattern within a string -> returns array of matched substrings.
+
+```ruby
+p "Time is 12:13am".scan(/\d+/)
+# ["12", "13"]
+```
+
+`gsub` is more powerful with regex, can refer to capture groups within replacements, eg: swap first and last name:
+
+```ruby
+# \1 and \2 refer to submatches in input string, must be escaped in double-quoted string
+puts "Alex Korban".gsub(/([a-zA-Z]+) ([a-zA-Z]+)/, "\\2, \\1")
+# Korban, Alex
+
+# single quoted string doesn't need escape
+puts "Alex Korban".gsub(/([a-zA-Z]+) ([a-zA-Z]+)/, '\2, \1')
+
+# use blocks for more complex replacements - eg: replace password in log lines with stars
+s = "Password: b1a12"
+puts s.gsub(/(Password:)\s+(\w+)/) { |match| "#{$1} " + "*" * $2.length }
+# Password: *****
+```
+
+### Symbols
+
+Used to add attribute accessor methods to classes and to make methods private:
+
+```ruby
+attr_accessor :destination
+private :batten_hatches
+```
+
+- Special kind of object
+- Combination of constant and string (sort of like enum in Java)
+- Instance of `Symbol` class
+- Only created via literals - colon followed by identifier or string literal, eg: `:"abc"`
+- String literal can include interpolated code, eg:
+
+```ruby
+direction = "west"
+:"turn_#{direction}" # :turn_west
+```
+
+- Globally unique and immutable
+- On first use, object is created behind the scenes
+- When referring to same symbol, referring to same object
+- Good substitute for strings when strings are used as labels (eg: passing method names to attr_accessor or passing symbol to catch block). Better to use symbol because string literal would create a new string object each time
+- Comparing symbols - compare object id's, whereas to compare strings, need to compare contents which is more computationally intensive
+- Symbols more efficient - memory use and performance
+- Also good for hash keys (covered later)
+- Also can be used as function parameter where param can be one of small set of values such as sort order, color from a predefined set, etc.
+
+```ruby
+traverse_tree(:depth_first )
+```
+
+Convert from string to symbol and vice versa:
+
+```ruby
+# to_s method converts symbol to its corresponding string
+:abc.to_s
+=> "abc"
+# to_sym method of string class performs reverse conversion
+"abc".to_sym
+=> :abc
+```
+
+### Arrays
+
+- Instances of `Array` class
+- Literal is sequence of comma separated elements wrapped in square brakcets, eg: `[1, 2, 3]`
+- Stores references to objects
+- Can contain objects of different types, eg: `[1, "Z", Object.new]`
+- Careful when cloning arrays due to storage of references
+- If need deep clone, have to write custom implementation
+
+**Array Creation**
+To create empty array most common is empty array literal rather than `Array.new` which is for more complex initialization
+
+```ruby
+arr = []
+=> []
+# create array with specified number of elements, all initialized to nil
+arr = Array.new(3)
+=> [nil, nil, nil]
+# second arg is default value...
+arr = Array.new(3, true)
+=> [true, true, true]
+# ...however, each element refers to same object
+arr = Array.new(3, "abc")
+=> ["abc", "abc", "abc"]
+arr.first.upcase!
+=> "ABC"
+arr
+=> ["ABC", "ABC", "ABC"] # all of them got converted cause they're referring to same object
+# to work around this, use block form of new, then every element will refer to a different object
+arr = Array.new(3) { "abc" }
+=> ["abc", "abc", "abc"]
+arr.last.upcase!
+=> "ABC"
+arr
+=> ["abc", "abc", "ABC"]
+# block form of new also useful for constructing multi-dimensional arrays
+arr = Array.new(3) { Array.new(3) }
+=> [[nil, nil, nil], [nil, nil, nil], [nil, nil, nil]]
+# %w creates array of strings from string of space separated words
+%w(array of words)
+=> ["array", "of", "words"]
+# Use backslash to insert literal space (escape sequences same as for single quoted strings)
+%w(array\ of words)
+=> ["array of", "words"]
+# Use %W to get same escape sequences and string interpolation like double quoted strings
+%W(1\tarray of #{2+2} words)
+=> ["1\tarray", "of", "4", "words"]
+# Use %i for array of symbols
+%i(up down left right)
+=> [:up, :down, :left, :right]
+```
+
+**Array Methods**
+
+```ruby
+arr = %i(up down left right)
+arr.size
+=> 4
+arr.empty?
+=> false
+# access any element using 0 based index in square brackets
+arr[1]
+=> :down
+# negative 1 based index to access elements in reverse order
+# -1 is index of last element
+arr
+=> [:up, :down, :left, :right]
+arr[-1]
+=> :right
+# -2 is index of second last element
+arr[-2]
+=> :left
+# slice array using square brackets
+arr = [1, 2, 3, 4, 5]
+=> [1, 2, 3, 4, 5]
+# return slice of array starting at index 1 and ending at index 3 (inclusive)
+arr[1..3]
+=> [2, 3, 4]
+# can use reverse index for either start or end of slice
+arr[1..-2]
+=> [2, 3, 4]
+# start at 4th last element (1 based) and go up to 4th element (0 based)
+arr[-4..4]
+=> [2, 3, 4, 5]
+# use square brackets operator to set elements of array
+arr[1] = "string value"
+=> "string value"
+arr
+=> 1, "string value", 3, 4, 5]
+# use esquare brackets to replace portions of array
+arr[2..3] = [:east, :west]
+=> [:east, :west]
+arr
+=> [1, "string value", :east, :west, 5]
+# append elements to array (array grows/shrinks as elements added/removed)
+arr << 10
+=> [1, "string value", :east, :west, 5, 10]
+# join two arrays with + operator
+[1, 2] + [3, 4]
+=> [1, 2, 3, 4]
+# duplicate elements using * operator
+[1, 2] * 3
+=> [1, 2, 1, 2, 1, 2]
+# if string is second arg to * operator, array converted to string with second arg as separator
+[1, 2] * ","
+=> "1,2"
+# use minus operator to delete one or more elements by value
+# any elements appearing in first array will be removed from first array
+[1, 2, 3, 2, 5] - [2, 5]
+=> [1, 3]
+```
+
+### Enumerable
+
+- `Enumerable` module is part of array interface
+- Modules are a way to package a set of methods and constants
+- Enumerable has ~50 methods
+- Makes working with collections very powerful
+
+```ruby
+# Use `map` method to apply a transformation to each element of a collection, returns transformed array.
+# map accepts a block - eg: multiply each element in array by 10
+[1, 2, 3].map { |v| v * 10 }
+=> [10, 20, 30]
+# Use `reduce` method to derive a value from all the elements
+[1, 2, 3].reduce(0) { |sum, v| sum + v }
+=> 6
+# Sort collection
+[10, 1, 7].sort
+=> [1, 7, 10]
+# Select returns portion of collection containing elements which match criteria defined by select's block argument
+[1, 2, 3, 4, 5].select { |n| n.even? }
+=> [2, 4]
+# Iterate over each consecutive block of 2 elements in array
+[1, 2, 3, 4, 5].each_cons(2) { |v| p v }
+[1, 2]
+[2, 3]
+[3, 4]
+[4, 5]
+ => nil
+```
+
+### Hashes
+
+- Due to Ruby's dynamic nature, Arrays and Hashes are very versatile, can be used to represent almost any data
+- Hash: Ordered collection of key/value pairs represented by hash class
+- Keys and values can be arbitrary objects
+- Keys must be unique
+- Hash literal denoted by curly braches: `h = {}`
+- Inside braces, commas separate each k/v pair and arrows point from key to value: `h = {"min" => 0, "max" => 100}`
+- Common to use symbols as hash keys, shortcut syntax: `h = {min: 0, max: 100}`
+- Think of hash like array but with arbitrary object indexes instead of integers
+
+```ruby
+h = {a: "a", b: "b"}
+=> {:a=>"a", :b=>"b"}
+# access hash elements by key using square brackets operator
+h[:a]
+=> "a"
+# replace value
+h[:a] = "z"
+=> "z"
+h
+=> {:a=>"z", :b=>"b"}
+# element is added if specify a key that is not already in hash
+h[:c] = "v"
+=> "v"
+h
+=> {:a=>"z", :b=>"b", :c=>"v"}
+# Using a key that isn't in hash to get an element returns nil
+h[:x]
+=> nil
+# Specify different default value using Hash.new, eg: to have 0 returned instead of nil
+# Works same as arrays -> same object reference is returned each time, if want different, use block version of new method
+h = Hash.new(0)
+=> {}
+h[:a]
+=> 0
+# Iterate over hash elements using `each`, notice `v` consists of both key and value
+h = {a: "a", b: "b"}
+=> {:a=>"a", :b=>"b"}
+h.each { |v| p v }
+[:a, "a"]
+[:b, "b"]
+ => {:a=>"a", :b=>"b"}
+# Iterate, separating key and value
+h.each { |k, v| puts "Key is #{k}, Value is #{v}" }
+Key is a, Value is a
+Key is b, Value is b
+ => {:a=>"a", :b=>"b"}
+# Hashes are ordered, each lists entries in the same order in which they were added to the hash
+# Hash class includes Enumerable module -> all methods available to arrays are also available to hashes
+```
+
+### Ranges
+
+- Can be created via literal -> two objects separated by two dots: `1..5 # [1, 5]` This is inclusive range, upper boundary included
+- Or 3 dots: `1...5 # [1, 5)` Exclusive range, upper boundary excluded
+- Includes enumerable module
+- To invoke methods on range, enclose in brackets:
+
+```ruby
+(1..10).class
+=> Range
+(1..10).begin
+=> 1
+(1..10).end
+=> 10
+# include tests if value is part of range
+(1..10).include?(11)
+=> false
+# map iterates over array representation of range
+(1..10).map { |v| v * 2 }
+=> [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+# ranges can consist of string values
+("aa".."ad").each { |v| puts v }
+aa
+ab
+ac
+ad
+ => "aa".."ad"
+# float range (but can't iterate)
+(1.0..5.0)
+=> 1.0..5.0
+```
+
+- Ranges can be used in case statement
+- Similar to class type matching
+- Range class has custom implementation of `===` operator that checks whether supplied value is within range
+
+```ruby
+puts case sample_reading
+     when 0..100 then "below normal"
+     when 101..150 then "normal"
+     else "excessive"
+     end
+```
+
+### Parallel Assignment
+
+- Related to standard collection types
+- Assign to multiple variables in a single statement
+
+```ruby
+# If right side of assignment is comma separated list -> converted to array whose elements are assigned to variables on the left
+a, b = 1, 2  # a == 1, b == 2
+# If assign comma separated list to single variable, list converted to array
+a = 1, 2, 3, 4  # a == [1, 2, 3, 4]
+# Right side of parallel assignment can be an actual array - useful when function returns multiple values
+# No need to create a temporary array holding results of function, can assign directly like so:
+def get_values
+  [1, 2, 3, 4]
+end
+a, b = get_values  # a == 1, b == 2
+# If want to assign first and last values but don't care about middle, use `_`
+# Unused variable warning is suppressed for `_`
+first, _, _, last = get_values  # first == 1, last == 4
+```
+
+### Splat Operator
+
+- Can combine parallel assignment with splat operator `*`
+- One value on left side of assignment can have splat operator applied to it -> accumulates as many elements as possible in array
+
+```ruby
+def get_values
+  [1, 2, 3, 4]
+end
+
+# If splat is last, gets all values remaining
+a, *b = get_values  # a == 1, b == [2, 3, 4]
+# If splat is not last, is greedy -> take as much as possible while leaving enough for following variables
+a, *b, c = get_values  # a == 1, b == [2, 3], c == 4
+```
+
+Splat can appear on right side of assignment -> objects its supplied to are converted to arrays, which have their elements expanded inline.
+
+```ruby
+# use range to assign elements from a sequence to variables
+a, b, c = *1..3  # a == 1, b == 2, c == 3
+# Use array as part of sequence to be assigned
+first, _, _, _, last = 1, 2, *[3, 4, 5]  # last == 5
+# Above can be simplified by using splat by itself instead of dummy vars
+# Splat can appear on both sides of assignment
+first, *, last = 1, 2, *[3, 4, 5]  # last == 5
+```
+
+Another use for splat operator
+
+```ruby
+r = (0..10)
+=> 0..10
+# Using splat operator on range inside array literal -> range converted to series of elements inserted into array
+[1, 2, *r]
+=> [1, 2, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+# Same concept works on hashes
+h = {a: "a", b: "b"}
+=> {:a=>"a", :b=>"b"}
+# Using splat on hash in array literal results in two arrays representing keys and values
+[*h]
+=> [[:a, "a"], [:b, "b"]]
+```
+
+Splat operator works on any class that implements `to_a` method [Example](module4/splat.rb)
+
+## Methods in Depth
+
+### Default Parameter Values

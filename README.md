@@ -1,7 +1,6 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-
 - [Ruby Fundamentals](#ruby-fundamentals)
   - [An introduction to Ruby](#an-introduction-to-ruby)
     - [Interactive Shell](#interactive-shell)
@@ -53,9 +52,16 @@
     - [Method Aliasing](#method-aliasing)
     - [Operators](#operators)
     - [Method Calls as Messages](#method-calls-as-messages)
-    - [method_missing](#method_missing)
+    - [method_missing](#methodmissing)
   - [More Ruby Tools: Blocks, Constants, Modules](#more-ruby-tools-blocks-constants-modules)
     - [Blocks](#blocks)
+    - [Block Local Variables](#block-local-variables)
+    - [Using Blocks](#using-blocks)
+    - [From Block to Proc](#from-block-to-proc)
+    - [Lambdas](#lambdas)
+    - [Using Procs and Lambdas](#using-procs-and-lambdas)
+    - [Constants](#constants)
+    - [Modules](#modules)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -2528,3 +2534,520 @@ end
 ## More Ruby Tools: Blocks, Constants, Modules
 
 ### Blocks
+
+- Piece of code between do/end keywords or curly braces
+- Convention: do/end used for multi-line blocks, curly braces used for single line
+- Only way to use blocks is to pass them as argument to method
+- Some methods can take a block as a special argument that comes after the regular arguments
+- Methods can execute block code once or multiple times
+- Method can pass arguments into blocks when it executes
+- Block arguments specified between vertical bars at start of block
+
+```ruby
+[1, 2, 3].each do
+  puts "This is Sreentiy, please respond"
+end
+
+ships = Spaceship.all
+ships.each { |ship| puts ship.name }
+```
+
+**Invoking Blocks**
+
+- Write a method that accepts a block as an argument
+- Simplest case, use `yield` keyword to execute block at some point in method
+
+```ruby
+class Spaceship
+  def debug_only
+    reutrn nil unless @debug
+    return nil unless block_given?
+    puts "Running debug code..."
+    yield # block executed here
+  end
+end
+
+# invoke method with no args -> does nothing
+ship.debug_only
+
+# invoke method with block -> executes if debug mode is true
+ship.debug_only do
+  puts "This is debug output"
+end
+```
+
+If block requires arguments, pass them to `yield`
+
+```ruby
+class Spaceship
+  def debug_only
+    reutrn nil unless @debug
+    return nil unless block_given?
+    puts "Running debug code..."
+    yield @debug_attrs # block executed here with args
+  end
+end
+
+# invoke method with block -> executes if debug mode is true
+ship.debug_only do |attrs|
+  puts "Debug attr values: #{attrs.inspect}"
+end
+```
+
+- Use of yield is similar to method call
+- Value of yield is result of executing last expression in block
+
+**Block Arguments**
+
+[Example](module6/block_args.rb)
+
+- Similar to method arguments
+- Can have default values
+- Can use keyword arguments
+- Can use array arguments with splat operator
+
+### Block Local Variables
+
+[Example](module6/block_local_vars.rb)
+
+- What happens when variable in block has same name as variable in outer scope?
+- Block arguments shadow same name variables in outer scope
+- Variables defined in block body don't shadow outer scope - problem - will overwrite variable
+- Block local variables solve this issue: Declare variable as block local in variable argument list - list local vars after `;` in argument list
+
+### Using Blocks
+
+- Blocks are closures (sort of)
+- Carry their context with them including local vars, class variables, constants and value of self
+- Block executes with all of the above as its context, convenient, don't need to pass in everything as arguments
+- If block contains return statement, it's executed in the scope block was defined in - can be an issue, scope may no longer exist by the time block is executing [Example](module6/block_return.rb)
+- Memory use: Since blocks carry their context with them, can prevent large objects from being garbage collected because they're still referred to by the block
+
+**Uses for Blocks**
+
+- Factor out common code into methods
+- Enable iterator methods - powerful alternative to regular loops
+- Help to eliminate boilerplate, such as implementation of ommon idiom: Execute Around
+
+```ruby
+# Time how long any arbitrary block of code took to execute
+def with_timing
+  start = Time.now
+  if block_given?
+    yield
+    puts "Time taken: #{Time.now - start} seconds"
+  end
+end
+
+def run_operation_1
+  sleep(1)
+end
+
+def run_operation_2; end
+
+# Run methods in a block passed to wtih_timing method
+with_timing do
+  run_operation_1
+  run_operation_2
+end
+```
+
+**Transaction Idiom**
+
+Make sure file is closed after being processed, or wrap db queries in a transaction.
+
+```ruby
+class Database
+  def transaction
+    start_transaction
+    begin
+      yield
+    rescue DBError => e
+      rollback_transactionl
+      log_error e.message
+      return
+    end
+    commit_transaction
+  end
+end
+
+DB.transaction do
+  # update multiple records
+end
+```
+
+**Block Limitations**
+
+- Can only pass one block into a method
+- Blocks can't be passed around between methods
+- Passing the same block to sevealmethods isn't DRY
+
+### From Block to Proc
+
+[Example](module6/proc.rb)
+
+Create a proc:
+
+1. Precede block name in method with `&` - converts block to proc
+
+```ruby
+def debug_only(param = nil, &block)
+  puts "Param class: #{param.class}"
+  puts "Block class: #{block.class}" if block_given?  # block variable is instance of type Proc
+end
+```
+
+2. Pass a block to `Proc.new` or or kernel method `proc` which is an alias
+
+```ruby
+p = Proc.new {|_bla| puts "I'm a proc that says #{blah}!"}
+p = proc {|_bla| puts "I'm a proc that says #{blah}!"}
+```
+
+To execute code stored in proc
+
+```ruby
+p.call "yay!"
+p.yeild "wow!"
+p.("nothing")
+p["hello"]
+```
+
+When blocks are converted to named object, easy to pass between different methods, refer to them with a variable.
+
+Can use for callbacks, lazy initialization -> store proc in instance variable, and call it later, eg when need to invoke a callback or run initialization.
+
+### Lambdas
+
+- Another way to convert block to an object
+- Object class method `lambda` converts a block to a Proc object
+- Resulting object is instance of Proc class, but behaves differently
+
+```ruby
+lmb = lambda {|bla| "I'm also a proc, and I say #{blah} }
+
+# more convenient syntax: stabby lambda, note parameter is listed outside of block body
+# NO SPACE between arrow and parameter list
+also_lmb = ->(bla) { "I'm also a proc, and I say #{blah} }
+```
+
+**Differences between Procs and Lambdas**
+
+- Generally procs behave similar to blocks - support dropping code into a method, but procs more flexible because they can be named and passed around like regular objects
+- Lambdas are like anonymous methods
+- Lambdas are strict about their arguments
+- `return` and `break` behave differently in procs vs lanbdas
+- `next` is the same in blocks, procs and lambdas -> returns control back to caller of block, proc or lambda
+
+**Differences in Argument Handling**
+
+- Passing too few or too many arguments to lambda expression causes exception
+- Passing too many arguments to blocks or procs, are discarded. Missing arguments are set to `nil`
+
+**Differences in return and break Handling**
+
+- `return` statement in block or proc executed in scope in which proc was defined, can cause issue if that scope no longer exists, eg: passing proc from one thread to another
+- `break` outside loop not allowed in a proc, but is allowed in a regular block
+- Recommended: Don't use `return` or `break` in procs. Avoid return statement in blocks
+- Lambdas: `break` and `return` return control to caller
+
+### Using Procs and Lambdas
+
+- Check number of arguments proc or lambda expects with `arity` method
+- If fixed number of args expected, returns positive integer
+- If some args are optional, returns number of non optional args + 1, with a minus sign
+
+```ruby
+proc {|a, b|}.arity  # => 2
+proc {|a, *b, c|}.arity  # => -3
+```
+
+Proc class implements triple equals `===` operator, which executes code stored in the proc, therefore can use procs and lambdas in case statement.
+
+```ruby
+weekend = proc {|time| time.saturday? || time.sunday?}
+weekday = proc {|time| time.wday < 6}
+
+# Passes Time.now to each proc, if proc returns true, executes corresponding case statement
+case Time.now
+when weekend then puts "Wake kup at 8:00"
+when weekday then puts "Wake up at 7:00"
+else puts "No wake up calls outside of time"
+end
+```
+
+**Symbol to Proc Conversion**
+
+Given a method that takes a regular parameter and a block, if method is invoked with a proc, it will be treated as a regular parameter. To tell the method it should be treated as a block, need to invoke method with `&proc`.
+
+When `&` is used, Ruby will attempt to coerce the passed in object into a proc if it isn't already, by invoking `to_proc` method on object.
+
+```ruby
+def debug_only(param = nil, &block)
+  puts "Param class: #{param.class}"
+  puts "Block class: #{block.class}" if block_given?
+end
+
+p = Proc.new {|a| puts "I'm a proc that says #{a}"}
+
+debug_only(p) # param == p
+debug_only(&p) # param == nil, block == p
+```
+
+Convert array of strings to upper case. Can either pass a block to array `map` method
+OR
+Shortcut is to pass a symbol with ampersand, telling Ruby to coerce it to a proc. This works because Ruby will invoke `to_proc` method on the symbol. The symbol class to_proc method, returns a proc which takes an argument and sends symbol to it as name of method to call.
+
+```ruby
+names = ["flying dutchman", "viking", "vagabond"]
+=> ["flying dutchman", "viking", "vagabond"]
+upper_names = names.map { |name| name.upcase }
+=> ["FLYING DUTCHMAN", "VIKING", "VAGABOND"]
+# shortcut
+upper_names = names.map(&:upcase)
+=> ["FLYING DUTCHMAN", "VIKING", "VAGABOND"]
+```
+
+### Constants
+
+- Use rather than symbol when need something that refers to actual value
+- Similar to variable - also a reference to an object
+- Name starts with upper case, eg: `MAX_SPEED = 1000`, by convention name the whole thing in upper case with words separated by underscore
+- Class names are constants (which is why they always start with upper case)
+- Constant created by assigning a value to it (same as variable)
+- Not strictly enforced, can assign a different object to it although will get warning
+- Use `freeze` method to prevent object from being modified, but not used often in practice (causes runtime error exception if try to modify object)
+- Once frozen, cannot unfreeze, but can check `frozen?` method
+- Even if frozen, can still modify objects it refers to (eg: when freezing array)
+
+```ruby
+MAX_SPEED = 100
+=> 100
+MAX_SPEED = 1000
+(irb):5: warning: already initialized constant MAX_SPEED
+(irb):4: warning: previous definition of MAX_SPEED was here
+=> 1000
+TYPES = []
+=> []
+TYPES << "freighter"
+=> ["freighter"]
+TYPES.freeze
+ => ["freighter"]
+# try to add another element after freezing
+TYPES << "foo"
+Traceback (most recent call last):
+        4: from /Users/dbaron/.rvm/rubies/ruby-2.6.0/bin/irb:23:in `<main>'
+        3: from /Users/dbaron/.rvm/rubies/ruby-2.6.0/bin/irb:23:in `load'
+        2: from /Users/dbaron/.rvm/rubies/ruby-2.6.0/lib/ruby/gems/2.6.0/gems/irb-1.0.0/exe/irb:11:in `<top (required)>'
+        1: from (irb):9
+FrozenError (can't modify frozen Array)
+TYPES.frozen?
+=> true
+TYPES[0].upcase!
+=> "FREIGHTER"
+TYPES
+=> ["FREIGHTER"]
+```
+
+**Scope**
+
+- If constant defined outside class or module, accessible throughout program
+- If defined inside class or module, can access anywhere inside that class or module
+- If need to access it from outside, use scope resolution operator (`::`) along with class name
+- Can also use `::` operator to add constants from outside class
+- Cannot define constants inside methods
+
+```ruby
+class A; MIN_SPEED = 0; end
+=> 0
+MIN_SPEED
+Traceback (most recent call last):
+        4: from /Users/dbaron/.rvm/rubies/ruby-2.6.0/bin/irb:23:in `<main>'
+        3: from /Users/dbaron/.rvm/rubies/ruby-2.6.0/bin/irb:23:in `load'
+        2: from /Users/dbaron/.rvm/rubies/ruby-2.6.0/lib/ruby/gems/2.6.0/gems/irb-1.0.0/exe/irb:11:in `<top (required)>'
+        1: from (irb):14
+NameError (uninitialized constant MIN_SPEED)
+Did you mean?  MAX_SPEED
+A::MIN_SPEED
+=> 0
+A::MAX_SPEED = 100
+=> 100
+```
+
+### Modules
+
+- Similar to classes but cannot be instantiated
+- Defined using `module` keyword
+- Can contain methods, constants, classes, other modules
+
+```ruby
+module SpaceStuff
+end
+```
+
+**Namespacing**
+
+Used for namespacing - eg: put all api related methods in API module. Need to add all methods at module level - prefix names with `self.`
+
+```ruby
+module API
+  def self.hatch_list
+    # retrieve hatch list
+  end
+end
+
+# invoke module method the same way as class method
+hatches = API.hatch_list
+```
+
+If classes are in module, access same way as constants, using scope operator `::`
+
+```ruby
+module SpaceStuff
+  class Spaceship
+  end
+end
+
+ship = SpaceStuff::Spaceship.new
+```
+
+Modules can be nested for more complex code organization
+
+```ruby
+module SpaceStuff
+  module API
+    def self.hatch_list
+      # retrieve hatch list
+    end
+  end
+end
+
+hatches = SpaeStuff::API.hatch_list
+```
+
+**Mixins**
+
+- Second purpose of modules is to mix in to classes, adding functionality to them
+- eg: enumerable module
+- Mixins included in classes
+- Class can include multiple modules (aka mixins) -> Ruby's alternative to multiple inheritance
+- Mixins usually contain instance methods whereas namespace modules do not
+
+```ruby
+module AirControl
+  # air pumping, maintenance and regeneration
+  def measure_oxygen
+    #...
+  end
+end
+
+class Spaceship
+  include AirControl # mixin the AirControl module
+  #...
+end
+
+ship = Spaceship.new
+ship.measure_oxygen # AirControl methods are now available on Spaceship instances
+```
+
+Modules slotted into inheritance hierarchy
+
+```ruby
+class Spaceship
+  include AirControl
+  include Docking
+  #...
+end
+```
+
+![mixins](doc-images/mixins.png 'mixins')
+
+- Order in inheritance diagram is significant.
+- Modules become most immediate ancestors of class
+- Ruby looks up method definitions first in modules, then further up inheritance chain
+- If two modules contain method with same name, last one wins (AirControl in example above)
+- Simplifies class hierarchy - rather than factoring out common code into a super class, simply place it in a module and include it wherever needed
+
+**Mixing in Class Methods**
+
+Use `extend` instead of `include`
+
+```ruby
+module Docking
+  def get_docking_params
+    # returns params common to all spaceships
+  end
+end
+
+class Spaceship
+  extend Docking
+end
+
+# Instance methods from module now available as class method
+Spaceship.get_docking_params
+```
+
+Cannot inject combination of class and instance methods into a class. Workaround is to wrap class methods in `ClassMethods` module. Then include the main module, and extend the ClassMethods submodule
+
+```ruby
+module Docking
+  module ClassMethods
+    def get_docking_params
+      # returns params common to all spaceships
+    end
+  end
+  def dock
+    #...
+  end
+end
+
+class Spaceship
+  include Docking
+  extend Docking::ClassMethods
+end
+```
+
+Very common for mixins to include combination of instance and class methods. To avoid having to both `include` and `extend` mixin, define `included` hook in mixin which will run whenever mixin is included in a class
+
+```ruby
+module Docking
+  module ClassMethods
+    def get_docking_params
+      # returns params common to all spaceships
+    end
+  end
+
+  def self.included(base)
+    base.extend(ClassMethods)
+  end
+
+  def dock
+    #...
+  end
+end
+
+class Spaceship
+  include Docking
+end
+```
+
+**Instance Variables in Modules**
+
+- Modules can include attribute accessor definitions
+- Could have name clash if methods in different modules use the same name -> careful when naming variables
+
+```ruby
+module AirControl
+  attr_accessor :oxygen_level
+
+  def measure_oxygen
+    #...
+    self.oxygen_level = measured_value
+  end
+
+  def start_pump
+    # instance variable created in object this was called on
+    @pump_status = :started
+  end
+end
+```

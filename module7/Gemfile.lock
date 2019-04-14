@@ -1,0 +1,9 @@
+GEM
+  specs:
+    log4r (1.1.10)
+
+PLATFORMS
+  x86-mingw32
+
+DEPENDENCIES
+  log4r

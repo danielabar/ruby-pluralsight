@@ -1,6 +1,7 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+
 - [Ruby Fundamentals](#ruby-fundamentals)
   - [An introduction to Ruby](#an-introduction-to-ruby)
     - [Interactive Shell](#interactive-shell)
@@ -52,7 +53,7 @@
     - [Method Aliasing](#method-aliasing)
     - [Operators](#operators)
     - [Method Calls as Messages](#method-calls-as-messages)
-    - [method_missing](#methodmissing)
+    - [method_missing](#method_missing)
   - [More Ruby Tools: Blocks, Constants, Modules](#more-ruby-tools-blocks-constants-modules)
     - [Blocks](#blocks)
     - [Block Local Variables](#block-local-variables)
@@ -62,6 +63,14 @@
     - [Using Procs and Lambdas](#using-procs-and-lambdas)
     - [Constants](#constants)
     - [Modules](#modules)
+  - [Putting Ruby to Work](#putting-ruby-to-work)
+    - [Organizing Source Code](#organizing-source-code)
+    - [Gems](#gems)
+    - [Gems and Managing Dependencies](#gems-and-managing-dependencies)
+    - [Testing](#testing)
+    - [Debugging](#debugging)
+    - [Packaging and Distributing Code](#packaging-and-distributing-code)
+    - [Resources](#resources)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1185,7 +1194,7 @@ sound_system.play_siren_cycle while high_alert?
 
 **Until**
 
-`if` has counterpart `unless`, `while` has counterpart `until` to be used with inverated condition.
+`if` has counterpart `unless`, `while` has counterpart `until` to be used with inverted condition.
 Condition evaluated at start of loop -> loop body may never execute if condition is initially true.
 
 ```ruby
@@ -3051,3 +3060,408 @@ module AirControl
   end
 end
 ```
+
+## Putting Ruby to Work
+
+### Organizing Source Code
+
+- So far in course examples have contained all code in a single file
+- Ruby does not enforce any particular file structure
+- Single file can contain any combination of modules, classes, methods and code that uses them -> not ideal for large program
+
+Considerations for organizing code:
+
+1. Structure of code expresed by methods, classes and modules
+2. Structure expressed through files and directories
+
+Given module and class hierarchy, recommended directory structure is:
+
+![organize source](doc-images/organize-src.png 'organize source')
+
+- Separate application code from library code (library code === modules and classes, application code === code that makes use of modules and classes)
+- This separation facilitates re-use and testing
+- `bin` dir contains executable utilities
+- `doc` by convention, this is folder for any documentation to be included with your application
+- `lib` library code goes here, since it's separate from app, easy to include in multiple different apps and easy to write a test runner to exercise this code
+- Each module gets its own subdir under `lib`
+- In above example, module `DeepSpace` is located at `lib/deep_space`
+- Naming convention: Classes and modules use camelCase, file names use snake_case
+- Each class in module goes in separate file under module dir
+- Module file located directly in module dir is for convenience (eg: `lib/deep_space/deep_space.rb`), contains includes for all needed files, so that app code only needs to include deep_space.rb to have access to all it's classes.
+- `test` folder contains tests
+- `init.rb` contains main application code, includes for example deep_space.rb, then kicks off application logic
+
+**Reassembling the Source**
+
+- Source is spread over multiple files, need to put it back together into a single executable program
+- `require` method includes file using absolute path `require absolute_path`, use variable `__dir__` to refer to current file's directory
+- If absolute path not provided, ruby looks for file in its load path, defined in global var `$LOAD_PATH`
+- Some paths included by default to allow for including standard library without specifying absolute paths
+- To include additional paths, pass to ruby command line interpreter using `-I` switch
+- No need to include `.rb` extension when passing file path/name to `require`
+- Can also use `require_relative` method which includes files relative to current path, eg: `require_relative 'deep_space/spaceship'`, convenient when including files located within a project
+- `require` and `require_relative` will not incude file again if already included
+
+```ruby
+require "#{__dir__}/deep_space/spaceship"
+require "json"
+```
+
+### Gems
+
+- For functionality not covered by standard libraries, need to install 3rd party libraries, aka _Gem_
+- To install a gem, use `gem` command which is part of `RubyGems` framework (installed with Ruby)
+- All gems available from central location [https://rubygems.org/](https://rubygems.org/), this site is used by `gem` command and can also use browser to see what's available
+- If not sure about specific name of gem, use [Ruby Toolbox](https://www.ruby-toolbox.com/) - categorizes ruby gems (eg: dependency management, sending email, image processing, logging etc.) and estimates popularity. Note some categories specific to Rails
+
+Exercise: Install [log4r](https://www.ruby-toolbox.com/projects/log4r)
+
+If know portion of gem name, can search with gem command:
+
+```shell
+$ gem search -r log4r
+*** REMOTE GEMS ***
+
+backlog4r (0.0.3)
+easy_log4r (0.1.0)
+log4j2log4r (0.0.1)
+log4r (1.1.10)
+log4r-azure (0.9.0)
+log4r-color (1.2.2)
+log4r-date_directory_file_outputter (0.1.1)
+log4r-exceptionable (0.8.0)
+log4r-fluent (0.0.3)
+log4r-gelf (1.1.0)
+log4r-logdna (0.6.0)
+log4r-logstash (0.1.1)
+log4r-mail (0.0.3)
+log4r-sequel (0.0.3)
+log4r-xmpp (0.1.0)
+log4r_auditor (1.1.0)
+log4r_hipchat_outputter (1.0.0)
+log4r_remote_syslog_outputter (0.0.1)
+log4rails (1.1.11)
+log4ruby (0.0.5)
+mtn_log4r (1.1.12)
+path-log4r (1.1.10)
+reasonable_log4r (1.0.0)
+revolutionhealth-log4r (2.0.0)
+skit-log4r-gelf (0.2.0)
+sml-log4r (1.0.6)
+timelog4r (0.3.3)
+vinted-log4r (1.1.11)
+```
+
+Install with `gem install`, if it depends on other gems, those will also be installed
+
+```shell
+$ gem install log4r
+Fetching log4r-1.1.10.gem
+Successfully installed log4r-1.1.10
+Parsing documentation for log4r-1.1.10
+Installing ri documentation for log4r-1.1.10
+Done installing documentation for log4r after 0 seconds
+1 gem installed
+```
+
+If using `rvm`, it uses "gem sets", maintains different sets of installed gems, useful it working on multiple projects that need different versions of the same gem.
+
+When using rvm and running `gem install`, will install gem into the current gem set.
+
+To see what gems you have:
+
+```shell
+$ gem list
+*** LOCAL GEMS ***
+
+ast (2.4.0)
+backport (0.3.0)
+bigdecimal (default: 1.4.1)
+bundler (default: 1.17.2)
+bundler-unload (1.0.2)
+cmath (default: 1.0.0)
+csv (default: 3.0.2)
+date (default: 1.0.0)
+dbm (default: 1.0.0)
+debase (0.2.2)
+debase-ruby_core_source (0.10.4)
+did_you_mean (1.3.0)
+e2mmap (default: 0.1.0)
+etc (default: 1.0.1)
+executable-hooks (1.6.0)
+fcntl (default: 1.0.0)
+fiddle (default: 1.0.0)
+fileutils (default: 1.1.0)
+forwardable (default: 1.2.0)
+gdbm (default: 2.0.0)
+gem-wrappers (1.4.0)
+htmlentities (4.3.4)
+io-console (default: 0.4.7)
+ipaddr (default: 1.2.2)
+irb (default: 1.0.0)
+jaro_winkler (1.5.2)
+json (default: 2.1.0)
+kramdown (1.17.0)
+log4r (1.1.10)
+...
+```
+
+To remove a gem:
+
+```shell
+$ gem uninstall gem-name
+```
+
+To start using a gem, add `require gem_name` to program. Gems installed in a dir that is included in the default load paths - no need to specify path for require.
+
+### Gems and Managing Dependencies
+
+- Need solution for working on a team
+- `Bundler` is a tool to make it easy to specify a list of dependencies and install them, including their dependencies in a single command
+- Bundler is a gem, install via `gem install bundler`
+- Gem dependencies pack must be in file `Gemfile`, which lists dependencies, where they can be installed from and version requirements
+- `Gemfile` must be committed in source control
+
+```ruby
+# Gemfile
+source 'https://rubygems.org'
+
+gem 'pg', '0.13.2'
+gem 'haml', '3.1.6'
+```
+
+Given a Gemfile exists in root of project dir, to install all deps run:
+
+```shell
+$ bundle install
+```
+
+### Testing
+
+- Very important in Ruby community
+- One approach is TDD: Test Driven Development
+- Another appraoch is BDD: Behaviour Driven Development
+- With either approach - write the test first, then write code to make tests pass
+- For TDD, several unit test libraries included in standard libraries: minitest, and wrapper for minitest providing additional functionality [Example using minitest](module7/test/test_spaceship.rb)
+
+```ruby
+# inlcude test library
+require "minitest/autorun"
+
+# include library code to be tested
+require_relative "../lib/module7"
+
+# inlcude entire module so don't need to prefix all class names with Module7
+include Module7
+
+# tests must be defined as methods in class derived from MiniTest::Unit::TestCase
+class TestSpaceship < MiniTest::Unit::TestCase
+  # setup shared across all test methods
+  def setup
+    @ship = Spaceship.new("Serenity")
+  end
+
+  def test_name
+    assert(@ship.name == " Serenity")
+  end
+
+  def test_probes
+    @ship.probes += [Probe.new, Probe.new]
+    assert_equal(2, @ship.probes.size)
+  end
+
+  def test_instance
+    assert_instance_of(Spaceship, @ship)
+  end
+
+  def test_exception
+    assert_raises { nil.name }
+  end
+
+end
+```
+
+Run the test:
+
+```shell
+$ ruby module7/test/test_spaceship.rb
+iniTest::Unit::TestCase is now Minitest::Test. From module7/test/test_spaceship.rb:6:in `<main>'
+Run options: --seed 15251
+
+# Running:
+
+....
+
+Finished in 0.000889s, 4499.4376 runs/s, 4499.4376 assertions/s.
+
+4 runs, 4 assertions, 0 failures, 0 errors, 0 skips
+```
+
+Minitest assertions:
+
+- `assert` assert given expression is true
+- `assert_equal` assert given arguments are equal
+- `assert_instance_of` tests whether given object is an instance of a particular class
+- `assert_raises` test whether given block of code raises any exceptions
+- Also have negative assertions starting with `refute`, eg: `refute_equal`, `refute_nil`
+
+**Spec Approach**
+
+Above are all examples of traditional unit test, can also write spec style tests. Spec approach emphasis more readable tests [Example](module7/test/spaceship_minispec.rb)
+
+```ruby
+require "minitest/autorun"
+
+require_relative "../lib/module7"
+include Module7
+
+describe Spaceship do
+  before do
+    @ship = Spaceship.new("Serenity")
+  end
+
+  describe "when asked for a name" do
+    it "must provide one" do
+      @ship.name.must_equal "Serenity"
+    end
+  end
+end
+```
+
+- Put tests in `describe`, which is a method that takes a block
+- `before` method is like `setup`
+- Nested describe calls contain test code
+- Rather than assertions, use matchers, eg: `must_equal`, called as method on a string for example
+- Others matchers include `must_raise`, `must_be_nil`
+
+**TDD with RSpec**
+
+- Another popular testing framework, more fully featured than spec approach provided by minitest
+- Install: `gem install rspec`
+
+```ruby
+describe Spaceship, "#name" do
+  it "returns the name" do
+    ship = Spaceship.new("Serenity")
+    ship.anme.should eq("Serenity")
+  end
+end
+```
+
+**BDD with Cucumber**
+
+- Provide foundation for behaviour driven development
+- Install: `gem install cucumber`
+- Even more readable tests
+- Instead of tests, have human readable spec, which is also executable
+- Describe features with series of test scenarios
+- Step: Each line in scenario
+
+```ruby
+Scenario: Try to launch more probes than the available number
+  Given I have 2 probes
+  And I launch 2 probes
+  When I launch 1 probe
+  Then I should be informed it isn't possible
+```
+
+Ruby code can be attached to each step, eg:
+
+```ruby
+Given /I launch (\d+) probe(?:s*)/ do |n|
+  n.to_i.times { @ship.launch_probe }
+end
+```
+
+- Matching between test code and scenarios done via regular expressions
+- Contents of capture groups in step definition get passed to code block
+- Cucumber often combined with RSpec or minitest
+- Works well for integration and higher level testing
+
+### Debugging
+
+Course shows demo with RubyMine, for VS Code, use Ruby extension and launch config like this:
+
+```javascript
+"configurations": [
+  {
+    "name": "Debug Ruby Spaceship",
+    "type": "Ruby",
+    "request": "launch",
+    "program": "${workspaceRoot}/module7/init.rb",
+    "stopOnEntry": true,
+    "showDebuggerOutput": true
+  }
+]
+```
+
+Can also debug a Ruby script from command line, will get into debugger prompt, enter commands to control execution of script.
+
+- `next 1` executes one line of code, stepping over method calls
+- `p` to examine variable
+- `q` quits debugger
+
+```shell
+$ ruby -r debug module7/runner.rb
+
+module7/runner.rb:1:require 'log4r'
+(rdb:1) next 1
+INFO mylog: Runner is executing!
+```
+
+### Packaging and Distributing Code
+
+- Need to distribute application for production use
+- Source control + Bundler: Simplest if running app is under your control - check that Ruby is installed on the server, checkout source from source control, install gems manually or using bundler
+- Package as gem: Another way, if you know users of your app already have Ruby installed, package your app as gem and make it available for download.
+- Gems can be used to package both apps and libraries, similar process
+- Course gives demo on creating gem project with RubyMine but can also do via cli with bundler:
+- `.gemspec` file contains metadata for gem in Ruby code
+- To build the gem, run: `gem build`, output will be `.gem` file
+- Locally install generated gem: `gem install foodie-0.0.1.gem`
+- Check that it's installed: `gem list`
+- `gem server` starts server on 8808, others on network can access it to install any gems installed on machine running the server: `gem install foodie --source http://gemserver:8088`
+
+```shell
+$ bundle gem foodie
+$ tree
+.
+└── foodie
+    ├── CODE_OF_CONDUCT.md
+    ├── Gemfile
+    ├── LICENSE.txt
+    ├── README.md
+    ├── Rakefile
+    ├── bin
+    │   ├── console
+    │   └── setup
+    ├── foodie.gemspec
+    ├── lib
+    │   ├── foodie
+    │   │   └── version.rb
+    │   └── foodie.rb
+    └── spec
+        ├── foodie_spec.rb
+        └── spec_helper.rb
+
+5 directories, 12 files
+```
+
+If your target audience doesn't have Ruby installed, use a tool to package your app such that it contains both your app code and a Ruby interpreter.
+
+Eg, to package `module7/runner.rb` along with dependencies specified in `module7/Gemfile` and all core Ruby libraries:
+
+```shell
+$ gem install ocra
+$ ocra runner.rb --gemfile Gemfile --no-dep-run --gem-full --add-all-core
+```
+
+Outputs `runner.exe`, standalone executable which your users can run without installing Ruby.
+
+### Resources
+
+- Documentation for standard library and gems [https://www.rubydoc.info/](https://www.rubydoc.info/), eg: stdlib -> core -> hash: [https://www.rubydoc.info/stdlib/core/Hash](https://www.rubydoc.info/stdlib/core/Hash)
+- Reference for other standard library classes, eg: minitest [https://www.rubydoc.info/stdlib/minitest](https://www.rubydoc.info/stdlib/minitest)
+- Everything about gems [https://rubygems.org/](https://rubygems.org/)
+- Ruby language [https://www.ruby-lang.org/en/](https://www.ruby-lang.org/en/)
+- Others: [https://www.ruby-toolbox.com/](https://www.ruby-toolbox.com/), [http://rspec.info/](http://rspec.info/), [https://docs.cucumber.io/](https://docs.cucumber.io/)

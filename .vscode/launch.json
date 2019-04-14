@@ -5,10 +5,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Local File",
+      "name": "Debug Ruby Spaceship",
       "type": "Ruby",
       "request": "launch",
-      "program": "${workspaceRoot}/module1/control_structs.rb"
+      "program": "${workspaceRoot}/module7/init.rb",
+      "stopOnEntry": true,
+      "showDebuggerOutput": true
     }
   ]
 }
